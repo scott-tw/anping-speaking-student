@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>英語口語評量</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFF7EA;
+    --primary: #17A398;
+    --accent: #FF5D5D;
+    --secondary: #FFC145;
+    --ink: #2B2A4A;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--ink);
+    font-family: 'Noto Sans TC', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1, h2, h3, .serif { font-family: 'Noto Serif TC', serif; }
+  #app {
+    max-width: 430px; margin: 0 auto; min-height: 100%;
+    display: flex; flex-direction: column;
+    padding: 20px 20px 32px;
+  }
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* ---- 共用元件 ---- */
+  .btn {
+    border: none; border-radius: 14px; padding: 14px 20px;
+    font-family: 'Noto Sans TC', sans-serif; font-weight: 700; font-size: 16px;
+    cursor: pointer; color: #fff; background: var(--primary);
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.secondary { background: #fff; color: var(--primary); border: 2px solid var(--primary); }
+  select, .picker-btn {
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: 2px solid #E7DFC9;
+    background: #fff; font-size: 16px; color: var(--ink); font-family: inherit;
+  }
+  select:disabled { background: #F1EAD9; color: #8a8578; cursor: not-allowed; }
+  .label { font-size: 13px; color: #8a8578; margin: 18px 0 6px; font-weight: 700; }
+  .top-title { text-align: center; margin: 4px 0 8px; font-size: 20px; }
+  .test-banner {
+    background: var(--secondary); color: var(--ink); font-weight: 700; font-size: 12px;
+    text-align: center; border-radius: 10px; padding: 6px 10px; margin-bottom: 10px;
+  }
+
+  /* ---- 身分／教材選擇 ---- */
+  #screen-setup { justify-content: center; gap: 4px; }
+  .setup-card {
+    background: #fff; border-radius: 20px; padding: 24px; box-shadow: 0 6px 20px rgba(43,42,74,.08);
+  }
+  .setup-card .btn { width: 100%; margin-top: 22px; }
+
+  /* ---- 待機／錄音中 ---- */
+  #screen-record { align-items: center; justify-content: center; text-align: center; gap: 28px; }
+  .unit-tag { color: var(--primary); font-weight: 700; font-size: 14px; }
+  .ref-text {
+    font-family: 'Noto Serif TC', serif; font-weight: 700; font-size: 30px; line-height: 1.5;
+    padding: 0 8px;
+  }
+  .demo-btn {
+    display: inline-flex; align-items: center; gap: 8px; background: none; border: none;
+    color: var(--primary); font-weight: 700; font-size: 15px; cursor: pointer;
+  }
+  .mic-btn {
+    width: 128px; height: 128px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--primary); color: #fff; box-shadow: 0 10px 24px rgba(23,163,152,.35);
+    display: flex; align-items: center; justify-content: center; transition: transform .15s;
+  }
+  .mic-btn:active { transform: scale(.94); }
+  .mic-btn.recording { background: var(--accent); box-shadow: 0 10px 24px rgba(255,93,93,.4); animation: pulse 1.4s infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,93,93,.45); }
+    70% { box-shadow: 0 0 0 22px rgba(255,93,93,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,93,93,0); }
+  }
+  .mic-btn svg { width: 52px; height: 52px; }
+  .hint { color: #8a8578; font-size: 14px; }
+  .status-text { font-weight: 700; color: var(--accent); font-size: 15px; min-height: 20px; }
+
+  /* ---- 結果 ---- */
+  #screen-result { gap: 16px; }
+  .result-ref {
+    font-family: 'Noto Serif TC', serif; font-weight: 700; font-size: 26px; line-height: 1.7;
+    text-align: center; padding: 12px 6px;
+  }
+  .word { cursor: pointer; border-bottom: 3px solid transparent; padding: 0 2px; border-radius: 4px; }
+  .word.good { color: #0d8a7f; border-color: var(--primary); }
+  .word.ok { color: #a67a00; border-color: var(--secondary); }
+  .word.bad { color: var(--accent); border-color: var(--accent); }
+  .word-detail {
+    display: none; background: #fff; border-radius: 14px; padding: 14px 16px; margin-top: -6px;
+    box-shadow: 0 4px 14px rgba(43,42,74,.08); font-size: 14px;
+  }
+  .word-detail.open { display: block; }
+  .word-detail .err { color: var(--accent); font-weight: 700; }
+  .scores-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 4px;
+  }
+  .score-tile {
+    background: #fff; border-radius: 14px; padding: 12px 6px; text-align: center;
+    box-shadow: 0 4px 14px rgba(43,42,74,.06);
+  }
+  .score-tile .num { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .score-tile .lbl { font-size: 11px; color: #8a8578; margin-top: 2px; }
+  .best-badge {
+    background: var(--secondary); color: var(--ink); font-weight: 700; font-size: 13px;
+    border-radius: 999px; padding: 4px 12px; align-self: center;
+  }
+  #screen-result .btn-row { display: flex; gap: 10px; margin-top: auto; padding-top: 12px; }
+  #screen-result .btn-row .btn { flex: 1; }
+
+  .top-back { align-self: flex-start; background: none; border: none; color: #8a8578; font-size: 14px; cursor: pointer; padding: 6px 0 14px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 步驟0：選擇班級/姓名/教材 ===== -->
+  <section id="screen-setup" class="screen active">
+    <div class="test-banner">🧪 測試版（獨立網頁託管，用於麥克風錄音測試）</div>
+    <h1 class="top-title serif">英語口語評量</h1>
+    <div class="setup-card">
+      <div class="label">班級</div>
+      <select id="selClass"><option value="">請選擇班級</option></select>
+      <div class="label">姓名</div>
+      <select id="selStudent" disabled><option value="">請先選班級</option></select>
+      <div class="label">年級（教材）</div>
+      <select id="selGrade"><option value="">請選擇年級</option></select>
+      <div class="label">單元／題目</div>
+      <select id="selMaterial" disabled><option value="">請先選年級</option></select>
+      <button class="btn" id="btnStart" disabled>開始評量</button>
+    </div>
+  </section>
+
+  <!-- ===== 步驟1／2：待機／錄音中 ===== -->
+  <section id="screen-record" class="screen">
+    <button class="top-back" id="btnChangeMaterial" style="align-self:flex-start;">← 換題目 / 換人</button>
+    <div class="unit-tag" id="unitTag"></div>
+    <div class="ref-text" id="refText"></div>
+    <button class="demo-btn" id="btnDemo">🔊 聽示範發音</button>
+    <button class="mic-btn" id="btnMic">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3z"/><path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V21h-2a1 1 0 100 2h6a1 1 0 100-2h-2v-3.08A7 7 0 0019 11z"/></svg>
+    </button>
+    <div class="status-text" id="statusText"></div>
+    <div class="hint" id="micHint">按下麥克風開始錄音，錄完再按一次會直接送出評分</div>
+  </section>
+
+  <!-- ===== 步驟3：看結果 ===== -->
+  <section id="screen-result" class="screen">
+    <div class="best-badge" id="bestBadge" style="display:none;">🌟 這是你目前最高分！</div>
+    <div class="result-ref" id="resultRefText"></div>
+    <div id="wordDetail" class="word-detail"></div>
+    <div class="scores-grid">
+      <div class="score-tile"><div class="num" id="scAccuracy">-</div><div class="lbl">Accuracy</div></div>
+      <div class="score-tile"><div class="num" id="scFluency">-</div><div class="lbl">Fluency</div></div>
+      <div class="score-tile"><div class="num" id="scCompleteness">-</div><div class="lbl">Completeness</div></div>
+      <div class="score-tile"><div class="num" id="scProsody">-</div><div class="lbl">Prosody</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn secondary" id="btnRetryAll">再念一次</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var API_BASE = 'https://script.google.com/macros/s/AKfycbyHWC_d1I-C1_J1D8FXtWBi6nlYjqL-QE9wN9LjuXpfQHmGzsYsSVSJDE9G2YqvV9Qm/exec';
+
+  // 呼叫 GAS 的 doPost API。刻意不設定 Content-Type（維持瀏覽器預設的 text/plain），
+  // 讓這個跨網域請求符合「簡單請求」條件，不會觸發 CORS 預檢（OPTIONS），Apps Script 才回得來。
+  function callApi(action, args) {
+    return fetch(API_BASE, {
+      method: 'POST',
+      body: JSON.stringify({ action: action, args: args || [] })
+    }).then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data.ok) throw new Error(data.error || '未知錯誤');
+        return data.result;
+      });
+  }
+
+  var state = {
+    className: '', studentId: '', studentName: '',
+    grade: '', materialId: '', referenceText: '', unitName: '',
+    mediaStream: null, audioCtx: null, processor: null, source: null,
+    chunks: [], sampleRate: 16000, recording: false
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+    $(id).classList.add('active');
+  }
+
+  // ---------- 步驟0：選擇班級/姓名/教材 ----------
+  function loadFail_(sel, err, retryFn) {
+    sel.innerHTML = '';
+    var opt = document.createElement('option');
+    opt.value = '';
+    var msg = err ? (err.message || String(err)) : '';
+    opt.textContent = '載入失敗，點這裡重試' + (msg ? '（' + msg.slice(0, 60) + '）' : '');
+    sel.appendChild(opt);
+    sel.disabled = false;
+    sel.onclick = function () {
+      sel.onclick = null;
+      retryFn();
+    };
+    if (err) console.error('載入失敗：', err);
+  }
+
+  function loadWithTimeout_(sel, retryFn, successFn, action, args) {
+    var done = false;
+    var timer = setTimeout(function () {
+      if (done) return;
+      done = true;
+      loadFail_(sel, new Error('逾時未回應'), retryFn);
+    }, 12000);
+    callApi(action, args).then(function (result) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        successFn(result);
+      } catch (e) {
+        loadFail_(sel, e, retryFn);
+      }
+    }).catch(function (err) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      loadFail_(sel, err, retryFn);
+    });
+  }
+
+  function loadClasses_() {
+    var sel = $('selClass');
+    sel.innerHTML = '<option value="">載入中...</option>';
+    loadWithTimeout_(sel, loadClasses_, function (classes) {
+      sel.innerHTML = '<option value="">請選擇班級</option>';
+      classes.forEach(function (c) {
+        var opt = document.createElement('option'); opt.value = c; opt.textContent = c; sel.appendChild(opt);
+      });
+    }, 'getClasses', []);
+  }
+  loadClasses_();
+
+  function loadGrades_() {
+    var sel = $('selGrade');
+    sel.innerHTML = '<option value="">載入中...</option>';
+    loadWithTimeout_(sel, loadGrades_, function (grades) {
+      sel.innerHTML = '<option value="">請選擇年級</option>';
+      grades.forEach(function (g) {
+        var opt = document.createElement('option'); opt.value = g; opt.textContent = g; sel.appendChild(opt);
+      });
+    }, 'getGrades', []);
+  }
+  loadGrades_();
+
+  function loadStudents_(cls) {
+    var sel = $('selStudent');
+    sel.innerHTML = '<option value="">載入中...</option>';
+    sel.disabled = true;
+    loadWithTimeout_(sel, function () { loadStudents_(cls); }, function (students) {
+      sel.innerHTML = '<option value="">請選擇姓名</option>';
+      students.forEach(function (s) {
+        var opt = document.createElement('option'); opt.value = s['學生ID']; opt.textContent = s['姓名'];
+        sel.appendChild(opt);
+      });
+      sel.disabled = false;
+      checkReady();
+    }, 'getStudentsByClass', [cls]);
+  }
+
+  $('selClass').addEventListener('change', function () {
+    var cls = this.value;
+    if (!cls) { var sel = $('selStudent'); sel.innerHTML = '<option value="">請先選班級</option>'; sel.disabled = true; checkReady(); return; }
+    loadStudents_(cls);
+  });
+
+  function loadMaterials_(grade) {
+    var sel = $('selMaterial');
+    sel.innerHTML = '<option value="">載入中...</option>';
+    sel.disabled = true;
+    loadWithTimeout_(sel, function () { loadMaterials_(grade); }, function (materials) {
+      sel.innerHTML = '<option value="">請選擇單元／題目</option>';
+      materials.forEach(function (m) {
+        var opt = document.createElement('option');
+        opt.value = m['教材ID'];
+        opt.textContent = m['單元名稱'] + '：' + m['參考文字'];
+        sel.appendChild(opt);
+      });
+      sel.disabled = false;
+      checkReady();
+    }, 'getMaterialsByGrade', [grade]);
+  }
+
+  $('selGrade').addEventListener('change', function () {
+    var grade = this.value;
+    if (!grade) { var sel = $('selMaterial'); sel.innerHTML = '<option value="">請先選年級</option>'; sel.disabled = true; checkReady(); return; }
+    loadMaterials_(grade);
+  });
+
+  function checkReady() {
+    $('btnStart').disabled = !($('selStudent').value && $('selMaterial').value);
+  }
+  $('selStudent').addEventListener('change', checkReady);
+  $('selMaterial').addEventListener('change', checkReady);
+
+  $('btnStart').addEventListener('click', function () {
+    state.className = $('selClass').value;
+    state.studentId = $('selStudent').value;
+    state.studentName = $('selStudent').options[$('selStudent').selectedIndex].textContent;
+    state.materialId = $('selMaterial').value;
+    var matOpt = $('selMaterial').options[$('selMaterial').selectedIndex].textContent;
+    var parts = matOpt.split('：');
+    state.unitName = parts[0];
+    state.referenceText = parts.slice(1).join('：');
+    $('unitTag').textContent = state.unitName + '　·　' + state.studentName;
+    $('refText').textContent = state.referenceText;
+    showScreen('screen-record');
+  });
+
+  $('btnChangeMaterial').addEventListener('click', function () { showScreen('screen-setup'); });
+
+  // ---------- 示範發音（語音合成）----------
+  $('btnDemo').addEventListener('click', function () {
+    if (!('speechSynthesis' in window)) return;
+    var u = new SpeechSynthesisUtterance(state.referenceText);
+    u.lang = 'en-US';
+    u.rate = 0.9;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  });
+
+  // ---------- 錄音（Web Audio API → 16kHz 16bit PCM WAV，避開 MediaRecorder 的 webm/opus 相容性問題）----------
+  function floatTo16BitPCM(float32) {
+    var out = new Int16Array(float32.length);
+    for (var i = 0; i < float32.length; i++) {
+      var s = Math.max(-1, Math.min(1, float32[i]));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return out;
+  }
+
+  function downsample(buffer, inRate, outRate) {
+    if (outRate === inRate) return buffer;
+    var ratio = inRate / outRate;
+    var newLen = Math.round(buffer.length / ratio);
+    var result = new Float32Array(newLen);
+    for (var i = 0; i < newLen; i++) {
+      result[i] = buffer[Math.round(i * ratio)];
+    }
+    return result;
+  }
+
+  function encodeWav(samples, sampleRate) {
+    var buffer = new ArrayBuffer(44 + samples.length * 2);
+    var view = new DataView(buffer);
+    function writeStr(off, str) { for (var i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); }
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+    var offset = 44;
+    for (var i = 0; i < samples.length; i++, offset += 2) view.setInt16(offset, samples[i], true);
+    return new Blob([view], { type: 'audio/wav' });
+  }
+
+  function blobToBase64(blob) {
+    return new Promise(function (resolve) {
+      var reader = new FileReader();
+      reader.onloadend = function () { resolve(reader.result.split(',')[1]); };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function startRecording() {
+    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      state.mediaStream = stream;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      state.audioCtx = new AC();
+      state.source = state.audioCtx.createMediaStreamSource(stream);
+      state.processor = state.audioCtx.createScriptProcessor(4096, 1, 1);
+      state.chunks = [];
+      state.processor.onaudioprocess = function (e) {
+        state.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      };
+      state.source.connect(state.processor);
+      state.processor.connect(state.audioCtx.destination);
+      state.recording = true;
+    });
+  }
+
+  function stopRecording() {
+    state.recording = false;
+    if (state.processor) { state.processor.disconnect(); }
+    if (state.source) { state.source.disconnect(); }
+    if (state.mediaStream) { state.mediaStream.getTracks().forEach(function (t) { t.stop(); }); }
+    var inRate = state.audioCtx ? state.audioCtx.sampleRate : 44100;
+    var total = state.chunks.reduce(function (n, c) { return n + c.length; }, 0);
+    var merged = new Float32Array(total);
+    var off = 0;
+    state.chunks.forEach(function (c) { merged.set(c, off); off += c.length; });
+    var down = downsample(merged, inRate, state.sampleRate);
+    var pcm16 = floatTo16BitPCM(down);
+    if (state.audioCtx) state.audioCtx.close();
+    return encodeWav(pcm16, state.sampleRate);
+  }
+
+  $('btnMic').addEventListener('click', function () {
+    if (!state.recording) {
+      $('statusText').textContent = '';
+      $('micHint').textContent = '請求麥克風權限中...';
+      startRecording().then(function () {
+        $('btnMic').classList.add('recording');
+        $('micHint').textContent = '錄音中，念完再按一次麥克風送出';
+      }).catch(function (err) {
+        $('micHint').textContent = '無法使用麥克風：' + err.message;
+      });
+    } else {
+      $('btnMic').classList.remove('recording');
+      $('micHint').textContent = '';
+      $('statusText').textContent = '評分中，請稍候...';
+      var wavBlob = stopRecording();
+      blobToBase64(wavBlob).then(function (base64) {
+        return callApi('submitRecording', [{
+          studentId: state.studentId,
+          materialId: state.materialId,
+          audioBase64: base64,
+          mimeType: 'audio/wav'
+        }]);
+      }).then(onScored).catch(onScoreError);
+    }
+  });
+
+  function onScoreError(err) {
+    $('statusText').textContent = '';
+    $('micHint').textContent = '評分失敗：' + (err.message || err) + '（可以再試一次）';
+  }
+
+  function scoreClass(score) {
+    if (score >= 80) return 'good';
+    if (score >= 60) return 'ok';
+    return 'bad';
+  }
+
+  function onScored(result) {
+    $('statusText').textContent = '';
+    $('scAccuracy').textContent = result.accuracy;
+    $('scFluency').textContent = result.fluency;
+    $('scCompleteness').textContent = result.completeness;
+    $('scProsody').textContent = result.prosody;
+
+    var refWrap = $('resultRefText');
+    refWrap.innerHTML = '';
+    result.words.forEach(function (w) {
+      var span = document.createElement('span');
+      span.className = 'word ' + scoreClass(w.score);
+      span.textContent = w.word;
+      span.dataset.word = w.word;
+      span.dataset.score = w.score;
+      span.dataset.err = w.errorType || '';
+      span.addEventListener('click', function () { openWordDetail(span); });
+      refWrap.appendChild(span);
+      refWrap.appendChild(document.createTextNode(' '));
+    });
+    $('wordDetail').classList.remove('open');
+
+    callApi('getStudentHistory', [state.studentId, state.materialId]).then(function (history) {
+      $('bestBadge').style.display = (history.bestRecordId === result.recordId) ? 'block' : 'none';
+    }).catch(function () {});
+
+    showScreen('screen-result');
+  }
+
+  function openWordDetail(span) {
+    var box = $('wordDetail');
+    var word = span.dataset.word, score = span.dataset.score, err = span.dataset.err;
+    box.innerHTML =
+      '<div><b>' + word + '</b>　分數：' + score + (err ? '　<span class="err">' + err + '</span>' : '') + '</div>' +
+      (err ? '<div style="margin-top:8px;">練習建議：放慢速度、拆開音節多念幾次這個字。</div>' +
+        '<button class="btn secondary" style="margin-top:10px;width:100%;" id="btnRetryWord">🎤 重新錄這個字</button>' : '');
+    box.classList.add('open');
+    if (err) {
+      $('btnRetryWord').addEventListener('click', function () { recordSingleWord(word); });
+    }
+  }
+
+  function recordSingleWord(word) {
+    var box = $('wordDetail');
+    if (!state.recording) {
+      startRecording().then(function () {
+        state.recording = true;
+        box.innerHTML = '<div>🔴 錄音中，念完「' + word + '」後點這裡送出</div>' +
+          '<button class="btn" style="margin-top:10px;width:100%;" id="btnStopWord">送出這個字</button>';
+        $('btnStopWord').addEventListener('click', function () {
+          var wavBlob = stopRecording();
+          box.innerHTML = '<div>評分中...</div>';
+          blobToBase64(wavBlob).then(function (base64) {
+            return callApi('practiceWord', [base64, word]);
+          }).then(function (r) {
+            box.innerHTML = '<div><b>' + word + '</b>　新分數：' + r.score + '</div>';
+          }).catch(function (err) {
+            box.innerHTML = '<div>評分失敗：' + (err.message || err) + '</div>';
+          });
+        });
+      });
+    }
+  }
+
+  $('btnRetryAll').addEventListener('click', function () {
+    $('unitTag').textContent = state.unitName + '　·　' + state.studentName;
+    $('refText').textContent = state.referenceText;
+    showScreen('screen-record');
+  });
+})();
+</script>
+</body>
+</html>
