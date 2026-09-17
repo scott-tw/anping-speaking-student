@@ -468,14 +468,6 @@
     $('scCompleteness').textContent = result.completeness;
     $('scProsody').textContent = result.prosody;
 
-    // TEMP：除錯用，顯示 Azure 原始回傳內容
-    if (result._debugRaw) {
-      var dbg = document.createElement('pre');
-      dbg.style.cssText = 'white-space:pre-wrap;word-break:break-all;font-size:11px;background:#fff;border-radius:10px;padding:10px;margin-top:12px;max-height:300px;overflow:auto;text-align:left;';
-      dbg.textContent = result._debugRaw;
-      $('resultRefText').insertAdjacentElement('afterend', dbg);
-    }
-
     var refWrap = $('resultRefText');
     refWrap.innerHTML = '';
     result.words.forEach(function (w) {
