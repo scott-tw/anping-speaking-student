@@ -45,10 +45,7 @@
   select:disabled { background: #F1EAD9; color: #8a8578; cursor: not-allowed; }
   .label { font-size: 13px; color: #8a8578; margin: 18px 0 6px; font-weight: 700; }
   .top-title { text-align: center; margin: 4px 0 8px; font-size: 20px; }
-  .test-banner {
-    background: var(--secondary); color: var(--ink); font-weight: 700; font-size: 12px;
-    text-align: center; border-radius: 10px; padding: 6px 10px; margin-bottom: 10px;
-  }
+  .field.hidden { display: none; }
 
   /* ---- 身分／教材選擇 ---- */
   #screen-setup { justify-content: center; gap: 4px; }
@@ -64,10 +61,12 @@
     font-family: 'Noto Serif TC', serif; font-weight: 700; font-size: 30px; line-height: 1.5;
     padding: 0 8px;
   }
+  .demo-row { display: flex; align-items: center; justify-content: center; gap: 14px; }
   .demo-btn {
     display: inline-flex; align-items: center; gap: 8px; background: none; border: none;
     color: var(--primary); font-weight: 700; font-size: 15px; cursor: pointer;
   }
+  .demo-btn.stop { color: var(--accent); }
   .mic-btn {
     width: 128px; height: 128px; border-radius: 50%; border: none; cursor: pointer;
     background: var(--primary); color: #fff; box-shadow: 0 10px 24px rgba(23,163,152,.35);
@@ -109,6 +108,9 @@
   }
   .score-tile .num { font-size: 22px; font-weight: 700; color: var(--primary); }
   .score-tile .lbl { font-size: 11px; color: #8a8578; margin-top: 2px; }
+  .score-tile .lbl-zh { font-size: 11px; color: var(--ink); font-weight: 700; margin-top: 1px; }
+  .score-tile .tier { font-size: 15px; margin-top: 6px; line-height: 1.3; }
+  .score-tile .tier-text { font-size: 10px; color: #8a8578; }
   .best-badge {
     background: var(--secondary); color: var(--ink); font-weight: 700; font-size: 13px;
     border-radius: 999px; padding: 4px 12px; align-self: center;
@@ -124,7 +126,6 @@
 
   <!-- ===== 步驟0：選擇班級/姓名/教材 ===== -->
   <section id="screen-setup" class="screen active">
-    <div class="test-banner">🧪 測試版（獨立網頁託管，用於麥克風錄音測試）</div>
     <h1 class="top-title serif">英語口語評量</h1>
     <div class="setup-card">
       <div class="label">班級</div>
@@ -133,7 +134,11 @@
       <select id="selStudent" disabled><option value="">請先選班級</option></select>
       <div class="label">年級（教材）</div>
       <select id="selGrade"><option value="">請選擇年級</option></select>
-      <div class="label">單元／題目</div>
+      <div class="field hidden" id="fieldSemester">
+        <div class="label">學期</div>
+        <select id="selSemester"><option value="">請選擇學期</option></select>
+      </div>
+      <div class="label">活動／主題</div>
       <select id="selMaterial" disabled><option value="">請先選年級</option></select>
       <button class="btn" id="btnStart" disabled>開始評量</button>
     </div>
@@ -144,7 +149,9 @@
     <button class="top-back" id="btnChangeMaterial" style="align-self:flex-start;">← 換題目 / 換人</button>
     <div class="unit-tag" id="unitTag"></div>
     <div class="ref-text" id="refText"></div>
-    <button class="demo-btn" id="btnDemo">🔊 聽示範發音</button>
+    <div class="demo-row">
+      <button class="demo-btn" id="btnDemo">🔊 聽示範發音</button>
+    </div>
     <button class="mic-btn" id="btnMic">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3z"/><path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V21h-2a1 1 0 100 2h6a1 1 0 100-2h-2v-3.08A7 7 0 0019 11z"/></svg>
     </button>
@@ -158,13 +165,34 @@
     <div class="result-ref" id="resultRefText"></div>
     <div id="wordDetail" class="word-detail"></div>
     <div class="scores-grid">
-      <div class="score-tile"><div class="num" id="scAccuracy">-</div><div class="lbl">Accuracy</div></div>
-      <div class="score-tile"><div class="num" id="scFluency">-</div><div class="lbl">Fluency</div></div>
-      <div class="score-tile"><div class="num" id="scCompleteness">-</div><div class="lbl">Completeness</div></div>
-      <div class="score-tile"><div class="num" id="scProsody">-</div><div class="lbl">Prosody</div></div>
+      <div class="score-tile">
+        <div class="num" id="scAccuracy">-</div>
+        <div class="lbl">Accuracy</div>
+        <div class="lbl-zh">準確度</div>
+        <div class="tier" id="tierAccuracy"></div>
+      </div>
+      <div class="score-tile">
+        <div class="num" id="scFluency">-</div>
+        <div class="lbl">Fluency</div>
+        <div class="lbl-zh">流暢度</div>
+        <div class="tier" id="tierFluency"></div>
+      </div>
+      <div class="score-tile">
+        <div class="num" id="scCompleteness">-</div>
+        <div class="lbl">Completeness</div>
+        <div class="lbl-zh">完整度</div>
+        <div class="tier" id="tierCompleteness"></div>
+      </div>
+      <div class="score-tile">
+        <div class="num" id="scProsody">-</div>
+        <div class="lbl">Prosody</div>
+        <div class="lbl-zh">語調韻律</div>
+        <div class="tier" id="tierProsody"></div>
+      </div>
     </div>
     <div class="btn-row">
       <button class="btn secondary" id="btnRetryAll">再念一次</button>
+      <button class="btn secondary" id="btnBackToSetup">換題目 / 換人</button>
     </div>
   </section>
 
@@ -187,9 +215,19 @@
       });
   }
 
+  // 個資保護：學生選單只顯示遮蔽過的姓名（中間字換成 O），內部仍用學生ID運作，
+  // 錄音紀錄、成績查詢都不受影響——教師端登入後看到的才是完整姓名。
+  function maskName(name) {
+    name = String(name || '');
+    if (name.length <= 1) return name;
+    if (name.length === 2) return name.charAt(0) + 'O';
+    return name.charAt(0) + new Array(name.length - 1).join('O') + name.charAt(name.length - 1);
+  }
+
   var state = {
     className: '', studentId: '', studentName: '',
-    grade: '', materialId: '', referenceText: '', unitName: '',
+    grade: '', semester: '', materialId: '', referenceText: '', unitName: '',
+    materialsById: {},
     mediaStream: null, audioCtx: null, processor: null, source: null,
     chunks: [], sampleRate: 16000, recording: false
   };
@@ -271,7 +309,9 @@
     loadWithTimeout_(sel, function () { loadStudents_(cls); }, function (students) {
       sel.innerHTML = '<option value="">請選擇姓名</option>';
       students.forEach(function (s) {
-        var opt = document.createElement('option'); opt.value = s['學生ID']; opt.textContent = s['姓名'];
+        var opt = document.createElement('option');
+        opt.value = s['學生ID'];
+        opt.textContent = maskName(s['姓名']);
         sel.appendChild(opt);
       });
       sel.disabled = false;
@@ -285,31 +325,69 @@
     loadStudents_(cls);
   });
 
-  function loadMaterials_(grade) {
+  // ---------- 學期（選填，只有這個年級底下真的有用學期分類的教材時才會出現這一步）----------
+  function loadSemesters_(grade) {
+    var field = $('fieldSemester');
+    var sel = $('selSemester');
+    loadWithTimeout_(sel, function () { loadSemesters_(grade); }, function (semesters) {
+      if (!semesters.length) {
+        field.classList.add('hidden');
+        state.semester = '';
+        loadMaterials_(grade, '');
+        return;
+      }
+      field.classList.remove('hidden');
+      sel.innerHTML = '<option value="">請選擇學期</option>';
+      semesters.forEach(function (sem) {
+        var opt = document.createElement('option'); opt.value = sem; opt.textContent = sem; sel.appendChild(opt);
+      });
+      var matSel = $('selMaterial');
+      matSel.innerHTML = '<option value="">請先選學期</option>';
+      matSel.disabled = true;
+      checkReady();
+    }, 'getSemestersByGrade', [grade]);
+  }
+
+  $('selSemester').addEventListener('change', function () {
+    var sem = this.value;
+    state.semester = sem;
+    if (!sem) { var sel = $('selMaterial'); sel.innerHTML = '<option value="">請先選學期</option>'; sel.disabled = true; checkReady(); return; }
+    loadMaterials_(state.grade, sem);
+  });
+
+  // ---------- 教材（下拉只顯示活動／主題名稱，實際要朗讀的文字內容留到錄音畫面才顯示，
+  // 短句子沒問題，但短文放在下拉選單裡會太長；同時也不再用切字串的方式取內容，
+  // 直接從 state.materialsById 查表，避免內容本身包含冒號時被誤判）----------
+  function loadMaterials_(grade, semester) {
     var sel = $('selMaterial');
     sel.innerHTML = '<option value="">載入中...</option>';
     sel.disabled = true;
-    loadWithTimeout_(sel, function () { loadMaterials_(grade); }, function (materials) {
-      sel.innerHTML = '<option value="">請選擇單元／題目</option>';
+    loadWithTimeout_(sel, function () { loadMaterials_(grade, semester); }, function (materials) {
+      state.materialsById = {};
+      sel.innerHTML = '<option value="">請選擇活動／主題</option>';
       materials.forEach(function (m) {
+        state.materialsById[m['教材ID']] = m;
         var opt = document.createElement('option');
         opt.value = m['教材ID'];
-        opt.textContent = m['單元名稱'] + '：' + m['參考文字'];
+        opt.textContent = m['單元名稱'];
         sel.appendChild(opt);
       });
       sel.disabled = false;
       checkReady();
-    }, 'getMaterialsByGrade', [grade]);
+    }, 'getMaterialsByGrade', [grade, semester || '']);
   }
 
   $('selGrade').addEventListener('change', function () {
     var grade = this.value;
+    state.grade = grade;
+    $('fieldSemester').classList.add('hidden');
     if (!grade) { var sel = $('selMaterial'); sel.innerHTML = '<option value="">請先選年級</option>'; sel.disabled = true; checkReady(); return; }
-    loadMaterials_(grade);
+    loadSemesters_(grade);
   });
 
   function checkReady() {
-    $('btnStart').disabled = !($('selStudent').value && $('selMaterial').value);
+    var semesterOk = $('fieldSemester').classList.contains('hidden') || $('selSemester').value;
+    $('btnStart').disabled = !($('selStudent').value && semesterOk && $('selMaterial').value);
   }
   $('selStudent').addEventListener('change', checkReady);
   $('selMaterial').addEventListener('change', checkReady);
@@ -319,24 +397,36 @@
     state.studentId = $('selStudent').value;
     state.studentName = $('selStudent').options[$('selStudent').selectedIndex].textContent;
     state.materialId = $('selMaterial').value;
-    var matOpt = $('selMaterial').options[$('selMaterial').selectedIndex].textContent;
-    var parts = matOpt.split('：');
-    state.unitName = parts[0];
-    state.referenceText = parts.slice(1).join('：');
+    var material = state.materialsById[state.materialId] || {};
+    state.unitName = material['單元名稱'] || '';
+    state.referenceText = material['參考文字'] || '';
     $('unitTag').textContent = state.unitName + '　·　' + state.studentName;
     $('refText').textContent = state.referenceText;
     showScreen('screen-record');
   });
 
   $('btnChangeMaterial').addEventListener('click', function () { showScreen('screen-setup'); });
+  $('btnBackToSetup').addEventListener('click', function () { showScreen('screen-setup'); });
 
-  // ---------- 示範發音（語音合成）----------
-  $('btnDemo').addEventListener('click', function () {
+  // ---------- 示範發音（語音合成，可中途按停止）----------
+  var btnDemo = $('btnDemo');
+  function setDemoPlaying_(playing) {
+    btnDemo.classList.toggle('stop', playing);
+    btnDemo.textContent = playing ? '⏹ 停止播放' : '🔊 聽示範發音';
+  }
+  btnDemo.addEventListener('click', function () {
     if (!('speechSynthesis' in window)) return;
+    if (speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+      setDemoPlaying_(false);
+      return;
+    }
     var u = new SpeechSynthesisUtterance(state.referenceText);
     u.lang = 'en-US';
     u.rate = 0.9;
-    speechSynthesis.cancel();
+    u.onend = function () { setDemoPlaying_(false); };
+    u.onerror = function () { setDemoPlaying_(false); };
+    setDemoPlaying_(true);
     speechSynthesis.speak(u);
   });
 
@@ -461,12 +551,29 @@
     return 'bad';
   }
 
+  // 分數等級：用可愛的圖示跟評語鼓勵學生，跟逐字的紅黃綠門檻分開設計，
+  // 這裡是四項整體代表分數，門檻拉高一點比較合理（90分以上才算「太棒了」）。
+  function scoreTier_(score) {
+    if (score >= 90) return { emoji: '🌟', text: '太棒了' };
+    if (score >= 70) return { emoji: '👍', text: '很不錯' };
+    return { emoji: '💪', text: '再加油' };
+  }
+
+  function renderTier_(elId, score) {
+    var tier = scoreTier_(score);
+    $(elId).innerHTML = tier.emoji + '<div class="tier-text">' + tier.text + '</div>';
+  }
+
   function onScored(result) {
     $('statusText').textContent = '';
     $('scAccuracy').textContent = result.accuracy;
     $('scFluency').textContent = result.fluency;
     $('scCompleteness').textContent = result.completeness;
     $('scProsody').textContent = result.prosody;
+    renderTier_('tierAccuracy', result.accuracy);
+    renderTier_('tierFluency', result.fluency);
+    renderTier_('tierCompleteness', result.completeness);
+    renderTier_('tierProsody', result.prosody);
 
     var refWrap = $('resultRefText');
     refWrap.innerHTML = '';
