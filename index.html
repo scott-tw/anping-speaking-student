@@ -46,6 +46,12 @@
   .label { font-size: 13px; color: #8a8578; margin: 18px 0 6px; font-weight: 700; }
   .top-title { text-align: center; margin: 4px 0 8px; font-size: 20px; }
   .field.hidden { display: none; }
+  .type-toggle { display: flex; gap: 8px; }
+  .type-btn {
+    flex: 1; padding: 12px 8px; border-radius: 12px; border: 2px solid #E7DFC9;
+    background: #fff; color: var(--ink); font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .type-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
   /* ---- 身分／教材選擇 ---- */
   #screen-setup { justify-content: center; gap: 4px; }
@@ -140,8 +146,17 @@
       <select id="selClass"><option value="">請選擇班級</option></select>
       <div class="label">姓名</div>
       <select id="selStudent" disabled><option value="">請先選班級</option></select>
-      <div class="label">年級（教材）</div>
-      <select id="selGrade"><option value="">請選擇年級</option></select>
+
+      <div class="label">選擇類型</div>
+      <div class="type-toggle">
+        <button type="button" class="type-btn active" id="btnTypePractice" data-type="課程練習">📘 課程練習</button>
+        <button type="button" class="type-btn" id="btnTypeActivity" data-type="主題活動">🎉 主題活動</button>
+      </div>
+
+      <div class="field" id="fieldGrade">
+        <div class="label">年級（教材）</div>
+        <select id="selGrade"><option value="">請選擇年級</option></select>
+      </div>
       <div class="field hidden" id="fieldSemester">
         <div class="label">學期</div>
         <select id="selSemester"><option value="">請選擇學期</option></select>
@@ -235,6 +250,7 @@
 
   var state = {
     className: '', studentId: '', studentName: '',
+    materialType: '課程練習',
     grade: '', semester: '', materialId: '', referenceText: '', unitName: '',
     materialsById: {},
     mediaStream: null, audioCtx: null, processor: null, source: null,
@@ -334,15 +350,39 @@
     loadStudents_(cls);
   });
 
-  // ---------- 學期（選填，只有這個年級底下真的有用學期分類的教材時才會出現這一步）----------
-  function loadSemesters_(grade) {
+  // ---------- 類型切換：課程練習（依年級）／主題活動（不分年級，全年級適用）----------
+  function setMaterialType_(type) {
+    state.materialType = type;
+    $('btnTypePractice').classList.toggle('active', type === '課程練習');
+    $('btnTypeActivity').classList.toggle('active', type === '主題活動');
+    $('fieldSemester').classList.add('hidden');
+    if (type === '主題活動') {
+      $('fieldGrade').classList.add('hidden');
+      loadActivitySemesters_();
+    } else {
+      $('fieldGrade').classList.remove('hidden');
+      if (state.grade) {
+        loadSemesters_(state.grade);
+      } else {
+        var sel = $('selMaterial');
+        sel.innerHTML = '<option value="">請先選年級</option>';
+        sel.disabled = true;
+      }
+    }
+    checkReady();
+  }
+  $('btnTypePractice').addEventListener('click', function () { setMaterialType_('課程練習'); });
+  $('btnTypeActivity').addEventListener('click', function () { setMaterialType_('主題活動'); });
+
+  // ---------- 學期（選填，只有真的有用學期分類的教材時才會出現這一步；課程練習依年級判斷，主題活動不分年級）----------
+  function loadSemesterStep_(action, args, onNone) {
     var field = $('fieldSemester');
     var sel = $('selSemester');
-    loadWithTimeout_(sel, function () { loadSemesters_(grade); }, function (semesters) {
+    loadWithTimeout_(sel, function () { loadSemesterStep_(action, args, onNone); }, function (semesters) {
       if (!semesters.length) {
         field.classList.add('hidden');
         state.semester = '';
-        loadMaterials_(grade, '');
+        onNone();
         return;
       }
       field.classList.remove('hidden');
@@ -354,36 +394,58 @@
       matSel.innerHTML = '<option value="">請先選學期</option>';
       matSel.disabled = true;
       checkReady();
-    }, 'getSemestersByGrade', [grade]);
+    }, action, args);
+  }
+
+  function loadSemesters_(grade) {
+    loadSemesterStep_('getSemestersByGrade', [grade], function () { loadMaterials_(grade, ''); });
+  }
+
+  function loadActivitySemesters_() {
+    loadSemesterStep_('getActivitySemesters', [], function () { loadActivities_(''); });
   }
 
   $('selSemester').addEventListener('change', function () {
     var sem = this.value;
     state.semester = sem;
     if (!sem) { var sel = $('selMaterial'); sel.innerHTML = '<option value="">請先選學期</option>'; sel.disabled = true; checkReady(); return; }
-    loadMaterials_(state.grade, sem);
+    if (state.materialType === '主題活動') {
+      loadActivities_(sem);
+    } else {
+      loadMaterials_(state.grade, sem);
+    }
   });
 
   // ---------- 教材（下拉只顯示活動／主題名稱，實際要朗讀的文字內容留到錄音畫面才顯示，
   // 短句子沒問題，但短文放在下拉選單裡會太長；同時也不再用切字串的方式取內容，
   // 直接從 state.materialsById 查表，避免內容本身包含冒號時被誤判）----------
+  function renderMaterialOptions_(materials) {
+    state.materialsById = {};
+    var sel = $('selMaterial');
+    sel.innerHTML = '<option value="">請選擇活動／主題</option>';
+    materials.forEach(function (m) {
+      state.materialsById[m['教材ID']] = m;
+      var opt = document.createElement('option');
+      opt.value = m['教材ID'];
+      opt.textContent = m['單元名稱'];
+      sel.appendChild(opt);
+    });
+    sel.disabled = false;
+    checkReady();
+  }
+
   function loadMaterials_(grade, semester) {
     var sel = $('selMaterial');
     sel.innerHTML = '<option value="">載入中...</option>';
     sel.disabled = true;
-    loadWithTimeout_(sel, function () { loadMaterials_(grade, semester); }, function (materials) {
-      state.materialsById = {};
-      sel.innerHTML = '<option value="">請選擇活動／主題</option>';
-      materials.forEach(function (m) {
-        state.materialsById[m['教材ID']] = m;
-        var opt = document.createElement('option');
-        opt.value = m['教材ID'];
-        opt.textContent = m['單元名稱'];
-        sel.appendChild(opt);
-      });
-      sel.disabled = false;
-      checkReady();
-    }, 'getMaterialsByGrade', [grade, semester || '']);
+    loadWithTimeout_(sel, function () { loadMaterials_(grade, semester); }, renderMaterialOptions_, 'getMaterialsByGrade', [grade, semester || '']);
+  }
+
+  function loadActivities_(semester) {
+    var sel = $('selMaterial');
+    sel.innerHTML = '<option value="">載入中...</option>';
+    sel.disabled = true;
+    loadWithTimeout_(sel, function () { loadActivities_(semester); }, renderMaterialOptions_, 'getActivities', [semester || '']);
   }
 
   $('selGrade').addEventListener('change', function () {
@@ -396,7 +458,8 @@
 
   function checkReady() {
     var semesterOk = $('fieldSemester').classList.contains('hidden') || $('selSemester').value;
-    $('btnStart').disabled = !($('selStudent').value && semesterOk && $('selMaterial').value);
+    var gradeOk = state.materialType === '主題活動' || $('selGrade').value;
+    $('btnStart').disabled = !($('selStudent').value && gradeOk && semesterOk && $('selMaterial').value);
   }
   $('selStudent').addEventListener('change', checkReady);
   $('selMaterial').addEventListener('change', checkReady);
