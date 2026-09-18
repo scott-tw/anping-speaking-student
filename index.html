@@ -427,7 +427,7 @@
       state.materialsById[m['教材ID']] = m;
       var opt = document.createElement('option');
       opt.value = m['教材ID'];
-      opt.textContent = m['單元名稱'];
+      opt.textContent = m['單元名稱'] + (m['難度'] ? '（' + m['難度'] + '）' : '');
       sel.appendChild(opt);
     });
     sel.disabled = false;
