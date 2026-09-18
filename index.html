@@ -115,6 +115,14 @@
     background: var(--secondary); color: var(--ink); font-weight: 700; font-size: 13px;
     border-radius: 999px; padding: 4px 12px; align-self: center;
   }
+  .score-tips {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .score-tips .tip {
+    background: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px;
+    box-shadow: 0 4px 14px rgba(43,42,74,.06); text-align: left;
+  }
+  .score-tips .tip b { color: var(--primary); }
   #screen-result .btn-row { display: flex; gap: 10px; margin-top: auto; padding-top: 12px; }
   #screen-result .btn-row .btn { flex: 1; }
 
@@ -190,6 +198,7 @@
         <div class="tier" id="tierProsody"></div>
       </div>
     </div>
+    <div id="scoreTips" class="score-tips"></div>
     <div class="btn-row">
       <button class="btn secondary" id="btnRetryAll">再念一次</button>
       <button class="btn secondary" id="btnBackToSetup">換題目 / 換人</button>
@@ -564,6 +573,48 @@
     $(elId).innerHTML = tier.emoji + '<div class="tier-text">' + tier.text + '</div>';
   }
 
+  // 分項改進建議：針對還沒到「太棒了」的分項給一句具體提示。
+  // Azure 其實有回傳更細的逐字語調／停頓資料，但那些技術訊號要轉成國小學生看得懂的具體建議
+  // 準確度還沒有把握，先用分項層級的通用提示上線，之後有需要再往逐字細節做。
+  var SCORE_TIPS_ = {
+    accuracy: {
+      label: '準確度',
+      low: '有些單字發音不太準確，可以點選文字裡標紅色的字，重新練習那幾個字的發音。',
+      mid: '整體發音不錯，還有一些字可以點開再練習得更準確。'
+    },
+    fluency: {
+      label: '流暢度',
+      low: '念的時候停頓比較多，試著把整句連起來念，不要一個字一個字分開停。',
+      mid: '念得算流暢，可以再練習讓速度更穩定、少一點停頓。'
+    },
+    completeness: {
+      label: '完整度',
+      low: '好像漏念了一些字或句子，記得把整段內容都念完喔。',
+      mid: '大部分都有念到，再確認一下有沒有漏掉的字。'
+    },
+    prosody: {
+      label: '語調韻律',
+      low: '語調可以更有高低起伏，重要的字念重一點、慢一點，會更像native speaker。',
+      mid: '語調不錯，可以再練習加強句子的節奏感跟重音。'
+    }
+  };
+
+  function renderScoreTips_(result) {
+    var dims = [
+      { key: 'accuracy', score: result.accuracy },
+      { key: 'fluency', score: result.fluency },
+      { key: 'completeness', score: result.completeness },
+      { key: 'prosody', score: result.prosody }
+    ];
+    var html = dims.map(function (d) {
+      if (d.score >= 90) return '';
+      var cfg = SCORE_TIPS_[d.key];
+      var msg = d.score >= 70 ? cfg.mid : cfg.low;
+      return '<div class="tip"><b>' + cfg.label + '</b>　' + msg + '</div>';
+    }).join('');
+    $('scoreTips').innerHTML = html;
+  }
+
   function onScored(result) {
     $('statusText').textContent = '';
     $('scAccuracy').textContent = result.accuracy;
@@ -574,6 +625,7 @@
     renderTier_('tierFluency', result.fluency);
     renderTier_('tierCompleteness', result.completeness);
     renderTier_('tierProsody', result.prosody);
+    renderScoreTips_(result);
 
     var refWrap = $('resultRefText');
     refWrap.innerHTML = '';
