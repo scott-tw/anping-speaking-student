@@ -38,9 +38,14 @@
   }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
   .btn.secondary { background: #fff; color: var(--primary); border: 2px solid var(--primary); }
-  select, .picker-btn {
+  select, .picker-btn, input[type=text] {
     width: 100%; padding: 14px 16px; border-radius: 12px; border: 2px solid #E7DFC9;
     background: #fff; font-size: 16px; color: var(--ink); font-family: inherit;
+  }
+  .birth-input { text-align: center; letter-spacing: 10px; font-size: 22px; }
+  .link-btn {
+    background: none; border: none; color: var(--primary); font-weight: 700; font-size: 14px;
+    cursor: pointer; padding: 8px 0; text-decoration: underline; align-self: center;
   }
   select:disabled { background: #F1EAD9; color: #8a8578; cursor: not-allowed; }
   .label { font-size: 13px; color: #8a8578; margin: 18px 0 6px; font-weight: 700; }
@@ -133,6 +138,29 @@
   #screen-result .btn-row .btn { flex: 1; }
 
   .top-back { align-self: flex-start; background: none; border: none; color: #8a8578; font-size: 14px; cursor: pointer; padding: 6px 0 14px; }
+
+  /* ---- 查詢我的成績 ---- */
+  .history-card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(43,42,74,.06); }
+  .history-card .type-badge {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: #F1EAD9; color: var(--ink); margin-bottom: 6px;
+  }
+  .history-card .type-badge.activity { background: #FFE9C2; color: #8a5a00; }
+  .history-card .unit { font-family: 'Noto Serif TC', serif; font-weight: 700; font-size: 16px; margin: 2px 0 6px; }
+  .history-card .meta { color: #8a8578; font-size: 12px; }
+  .history-bar-chart { display: flex; align-items: flex-end; gap: 5px; height: 46px; margin: 8px 0 2px; }
+  .history-bar { width: 12px; background: #E7DFC9; border-radius: 3px 3px 0 0; position: relative; }
+  .history-bar.best { background: var(--primary); }
+  .history-bar .star { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 10px; }
+  .history-errors {
+    background: #fff; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px;
+    box-shadow: 0 4px 14px rgba(43,42,74,.06); font-size: 13px; color: var(--accent);
+  }
+  .history-empty { color: #8a8578; font-size: 14px; text-align: center; padding: 40px 0; }
+  .score-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 13px; }
+  .score-pill.good { background: #DFF5F2; color: #0d8a7f; }
+  .score-pill.ok { background: #FFF3D6; color: #a67a00; }
+  .score-pill.bad { background: #FFE3E3; color: var(--accent); }
 </style>
 </head>
 <body>
@@ -165,6 +193,31 @@
       <select id="selMaterial" disabled><option value="">請先選年級</option></select>
       <button class="btn" id="btnStart" disabled>開始評量</button>
     </div>
+    <button type="button" class="link-btn" id="btnGoHistory">🔍 查詢我的成績</button>
+  </section>
+
+  <!-- ===== 查詢我的成績：身分驗證 ===== -->
+  <section id="screen-history-login" class="screen">
+    <button class="top-back" id="btnHistBack1">← 返回</button>
+    <h1 class="top-title serif">查詢我的成績</h1>
+    <div class="setup-card">
+      <div class="label">班級</div>
+      <select id="selHistClass"><option value="">請選擇班級</option></select>
+      <div class="label">姓名</div>
+      <select id="selHistStudent" disabled><option value="">請先選班級</option></select>
+      <div class="label">生日（4碼，例如 0315）</div>
+      <input type="text" id="inpBirth" class="birth-input" maxlength="4" inputmode="numeric" placeholder="MMDD">
+      <div class="status-text" id="histLoginError"></div>
+      <button class="btn" id="btnHistSubmit" disabled>查詢</button>
+    </div>
+  </section>
+
+  <!-- ===== 查詢我的成績：結果 ===== -->
+  <section id="screen-history-result" class="screen">
+    <button class="top-back" id="btnHistBack2">← 返回</button>
+    <h1 class="top-title serif" id="histResultTitle"></h1>
+    <div id="histCommonErrors"></div>
+    <div id="histMaterialsList"></div>
   </section>
 
   <!-- ===== 步驟1／2：待機／錄音中 ===== -->
@@ -752,6 +805,105 @@
     $('refText').textContent = state.referenceText;
     showScreen('screen-record');
   });
+
+  // ---------- 查詢我的成績（生日驗證身分後才看得到，只顯示自己的資料，不含班級平均或其他同學）----------
+  $('btnGoHistory').addEventListener('click', function () {
+    $('inpBirth').value = '';
+    $('histLoginError').textContent = '';
+    checkHistReady_();
+    showScreen('screen-history-login');
+    loadHistClasses_();
+  });
+  $('btnHistBack1').addEventListener('click', function () { showScreen('screen-setup'); });
+  $('btnHistBack2').addEventListener('click', function () { showScreen('screen-setup'); });
+
+  function loadHistClasses_() {
+    var sel = $('selHistClass');
+    sel.innerHTML = '<option value="">載入中...</option>';
+    loadWithTimeout_(sel, loadHistClasses_, function (classes) {
+      sel.innerHTML = '<option value="">請選擇班級</option>';
+      classes.forEach(function (c) {
+        var opt = document.createElement('option'); opt.value = c; opt.textContent = c; sel.appendChild(opt);
+      });
+    }, 'getClasses', []);
+  }
+
+  function loadHistStudents_(cls) {
+    var sel = $('selHistStudent');
+    sel.innerHTML = '<option value="">載入中...</option>';
+    sel.disabled = true;
+    loadWithTimeout_(sel, function () { loadHistStudents_(cls); }, function (students) {
+      sel.innerHTML = '<option value="">請選擇姓名</option>';
+      students.forEach(function (s) {
+        var opt = document.createElement('option');
+        opt.value = s['學生ID'];
+        opt.textContent = maskName(s['姓名']);
+        sel.appendChild(opt);
+      });
+      sel.disabled = false;
+      checkHistReady_();
+    }, 'getStudentsByClass', [cls]);
+  }
+
+  $('selHistClass').addEventListener('change', function () {
+    var cls = this.value;
+    if (!cls) { var sel = $('selHistStudent'); sel.innerHTML = '<option value="">請先選班級</option>'; sel.disabled = true; checkHistReady_(); return; }
+    loadHistStudents_(cls);
+  });
+
+  function checkHistReady_() {
+    var birthOk = /^\d{4}$/.test($('inpBirth').value.trim());
+    $('btnHistSubmit').disabled = !($('selHistStudent').value && birthOk);
+  }
+  $('selHistStudent').addEventListener('change', checkHistReady_);
+  $('inpBirth').addEventListener('input', checkHistReady_);
+
+  $('btnHistSubmit').addEventListener('click', function () {
+    var studentId = $('selHistStudent').value;
+    var birth = $('inpBirth').value.trim();
+    $('histLoginError').textContent = '';
+    $('btnHistSubmit').disabled = true;
+    callApi('getMyRecords', [studentId, birth]).then(function (data) {
+      $('btnHistSubmit').disabled = false;
+      renderHistoryResult_(data);
+      showScreen('screen-history-result');
+    }).catch(function (err) {
+      $('btnHistSubmit').disabled = false;
+      $('histLoginError').textContent = err.message || String(err);
+    });
+  });
+
+  function renderHistoryResult_(data) {
+    $('histResultTitle').textContent = data.name + ' 的成績';
+
+    var errBox = $('histCommonErrors');
+    errBox.innerHTML = data.commonErrors.length
+      ? '<div class="history-errors">🔤 我常唸錯的音：' + data.commonErrors.map(function (e) { return e.label + ' ×' + e.count; }).join('、') + '</div>'
+      : '';
+
+    var list = $('histMaterialsList');
+    list.innerHTML = '';
+    if (!data.materials.length) {
+      list.innerHTML = '<div class="history-empty">還沒有任何練習紀錄</div>';
+      return;
+    }
+    data.materials.forEach(function (m) {
+      var card = document.createElement('div');
+      card.className = 'history-card';
+      var isActivity = m.type === '主題活動';
+      var maxH = 40;
+      var bars = m.history.map(function (h) {
+        var hpx = Math.max(3, Math.round((h.overall / 100) * maxH));
+        return '<div class="history-bar' + (h.isBest ? ' best' : '') + '" style="height:' + hpx + 'px;">' + (h.isBest ? '<span class="star">★</span>' : '') + '</div>';
+      }).join('');
+      card.innerHTML =
+        '<div class="type-badge' + (isActivity ? ' activity' : '') + '">' + (isActivity ? '🎉 主題活動' : '📘 課程練習') + '</div>' +
+        '<div class="unit">' + m.unitName + '</div>' +
+        '<div class="meta">代表分數 <span class="score-pill ' + scoreClass(m.bestScore) + '">' + m.bestScore + '</span>　共 ' + m.attempts + ' 次嘗試</div>' +
+        '<div class="history-bar-chart">' + bars + '</div>';
+      list.appendChild(card);
+    });
+  }
 })();
 </script>
 </body>
